@@ -312,14 +312,6 @@ def def_bounds(n_param, k, account_ingress = False, serial_corr = False):
         alt_bounds = Bounds(q_lb, q_ub)
         return alt_bounds
     
-    if serial_corr == True:
-        # bounds for serial correlation
-        q_lb[-1] = 0
-        q_ub[-1] = 1
-        
-        alt_bounds = Bounds(q_lb, q_ub)
-        return alt_bounds
-    
     return reg_bounds
 
 # calculate linear constraints
