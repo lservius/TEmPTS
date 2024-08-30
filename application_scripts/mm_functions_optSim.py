@@ -281,7 +281,7 @@ def eqTin(df, proportion = True, giveK = False):
 
 ## BOUNDS AND CONSTRAINTS FOR MINIMISATION
 # calculate bounds
-def def_bounds(n_param, k, account_ingress = False):
+def def_bounds(n_param, k, account_ingress = False, serial_corr = False):
     q_lb = np.zeros(n_param)
     q_ub = np.zeros(n_param)
 
@@ -307,6 +307,14 @@ def def_bounds(n_param, k, account_ingress = False):
     if account_ingress == True:
         # bounds for ingress
         q_lb[-1] = -1
+        q_ub[-1] = 1
+        
+        alt_bounds = Bounds(q_lb, q_ub)
+        return alt_bounds
+    
+    if serial_corr == True:
+        # bounds for serial correlation
+        q_lb[-1] = 0
         q_ub[-1] = 1
         
         alt_bounds = Bounds(q_lb, q_ub)
@@ -456,7 +464,7 @@ def calc_S1_donors(theta, M_donors, N_donors, T_donors, k, u_donors, Q_template 
         
     return S1
 
-# Calculate minimisation of S1
+# Calculate minimisation of S2
 def calc_S2(theta, M, N, T, k, u, Q_template = np.array(None), stop_region = 1e5):
     S2 = np.zeros(1, dtype = 'float128')
     
@@ -502,6 +510,91 @@ def calc_S2(theta, M, N, T, k, u, Q_template = np.array(None), stop_region = 1e5
         
         S2 += S2_i
 
+    return S2
+
+# Calculate cost function with serially correlated noise terms
+def calc_SC(param, M, N, T, k, u, Q_template = np.array(None), stop_region = 1e5):
+    SC = np.zeros(1, dtype = 'float128')
+    
+    ro = param[-1]
+    theta = param[:-1]
+        
+    for l in range(2,T):
+        
+        u_l = u[l-1]
+
+        M_l = M[:, l]
+        
+        # N_{l}
+        N_l = N[:,l]
+        
+        # N_{l-1}
+        N_lm1 =N[:, (l-1)]
+        
+        # Q from thetaoverflow encountered in matmul
+        Q = theta_to_Q(theta, k, Q_template)
+        
+        # calculate P_l
+        A,D,d,A_inv = eigendecomp(Q)
+        exp_dt = np.exp(d*u_l)
+        exp_D = np.diag(exp_dt)
+        
+        # @ is short-hand for np.matmul
+        P_l = A @ exp_D @ A_inv
+        P1_l = np.delete(P_l, -1, 1)
+        
+        epsi_l = (M_l - P1_l.transpose() @ N_lm1)     
+        psi_inv = np.zeros(((k-1),(k-1)))
+        
+        N_l[N_l == 0] = 1e-18
+        
+        for i in range(k-1):
+            for j in range(k-1):
+                if i == j:
+                    psi_inv[i,j] = (1/N_l[k-1] + 1/N_l[i])
+                else:
+                    psi_inv[i,j] = 1/N_l[k-1]
+          
+        # avoid inf values, this can be set based on range of problem
+        if np.linalg.norm(psi_inv,np.inf) > stop_region:
+            SC = stop_region
+            break
+        elif np.isnan(psi_inv).any() == True:
+            SC = stop_region
+            break
+        
+        SC_i = epsi_l.transpose() @ psi_inv @ epsi_l
+
+        if np.iscomplexobj(SC_i):
+            SC = stop_region
+            break
+        
+        SC += SC_i
+
+    return SC
+
+# Calculate minimisation of S1 with donor consideration
+def calc_SC_donors(param, M_donors, N_donors, T_donors, k, u_donors, Q_template = np.array(None), stop_region = 1e5):
+    S2 = np.zeros(1, dtype = 'float128')
+    
+    donors = list(M_donors.keys())
+    number_donors = len(donors)
+    
+    # the M,N,T values are dictionaries over the donors
+    for d in range(number_donors):
+        M = M_donors[donors[d]]
+        N = N_donors[donors[d]]
+        T = T_donors[donors[d]]
+        u = u_donors[donors[d]]
+        
+        S2_donor = calc_SC(param, M, N, T, k, u, Q_template, stop_region)
+        
+        # average so that it is not weighted by the number of time points sampled for each donor.
+        
+        S2_donor = S2_donor / T
+        
+        S2 += S2_donor
+      
     return S2
 
 # Calculate minimisation of S1 with additional parameter handing ingress
@@ -642,7 +735,7 @@ def mc_optimiser(func, args, bounds, constraints, sampN, sampRange_ub=1e0, optio
     
     return theta_est, S1_min
 
-def single_mc_optimiser(sampN,func, args, bounds, constraints, sampRange_ub, thetaFun, ingressAccount=False, ingressInitial=1e0, hessian = None, xtol=1e-15, gtol = 1e-15, maxiter=1e-4):
+def single_mc_optimiser(sampN,func, args, bounds, constraints, sampRange_ub, thetaFun, ingressAccount, ingressInitial=0, hessian = None, xtol=1e-15, gtol = 1e-15, maxiter=1e-4):
     
     def applyFun(fn, **kwargs):
         return fn(**kwargs)
@@ -655,6 +748,7 @@ def single_mc_optimiser(sampN,func, args, bounds, constraints, sampRange_ub, the
     
     S1_min = S1.fun
     theta_est = S1.x
+    
     
     return theta_est, S1_min 
 
@@ -706,7 +800,7 @@ def parallel_mc_optimiser(iter_samp, n_cores, n_param, theta_generator = make_th
             if progress_bar==True:
                 i+=1
                 bar.update(i)
-            
+
             if cost < costFunc_min:
                 theta_min = est
                 costFunc_min = cost
