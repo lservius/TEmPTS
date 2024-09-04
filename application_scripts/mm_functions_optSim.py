@@ -173,16 +173,17 @@ def generateAggStates(N0, Q_ij, n_generate, u = [1], recruit = True, timeCount =
         df[tomorrow] = d1
         
         if noise == True:
-            # add 1% noise
+            # add 1% noise but prevent negative values
             df[tomorrow] += int(np.random.normal(loc=0, scale=scale_noise))
-        
+            df.loc[df[tomorrow] < 0, tomorrow] = 0
+                    
         iter += 1
         
     
     return df
 
 # generate the parameters for simulation or estimation seeds
-def make_theta0(k, format = 'theta', ub = 2e-1, options = {'ingress': False, 'initial': 1e0}):
+def make_theta0(k, format = 'theta', ub = 1e-1, options = {'ingress': False, 'initial': 1e0}):
     # create starting intensity trans. mat
     Q_0 = np.zeros((k,k))
 
@@ -249,13 +250,44 @@ def formatCount(data, day_series, timepoint_col_name, state_col_name, timemarker
     return(ISO)
 
 # proportion the state counts
-def eqTin(df, proportion = True, giveK = False):
+def eqTin(df, proportion = True, giveK = False, perDonor = False, donor_list = [], donor_column = '', time_column = '', state_column = '', state_list = []):
     T = df.shape[1]
     k = df.shape[0]
     
     input_N = df.copy()
     N = np.zeros(input_N.shape)
     
+    if perDonor == True:
+        M_donors = {}
+        N_donors = {}
+        T_donors = {}
+        u_donors = {}
+        donors = donor_list
+        timeCourse = {}
+
+        for d in donors:
+    
+            # donor filter
+            df_donor = df.loc[df[donor_column] == d, :]
+            
+            # extract the sampled time points
+            timepoint_list = np.sort(df_donor[time_column].unique())
+            timeCourse[d] = timepoint_list.shape[0] 
+            
+            # transform into state count
+            yfv_donor = formatCount(df, timepoint_list, time_column, state_column, timemarker='d', isotype_list=state_list)
+
+            # transform into nump array for calculations
+            yfv_donor = yfv_donor.to_numpy()
+            
+            N, M, T, k = eqTin(yfv_donor, proportion=False)
+            
+            M_donors[d] = M
+            N_donors[d] = N
+            T_donors[d] = T
+            u_donors[d] = np.diff(timepoint_list)
+        return M_donors, N_donors, T_donors, k, u_donors
+        
     if proportion == False:
         M = np.delete(N, -1,0)  
         
@@ -275,7 +307,8 @@ def eqTin(df, proportion = True, giveK = False):
     
     if giveK == True:
         return N, M, T, k  
-        
+    
+   
     return N, M, T
 
 
@@ -307,6 +340,14 @@ def def_bounds(n_param, k, account_ingress = False, serial_corr = False):
     if account_ingress == True:
         # bounds for ingress
         q_lb[-1] = -1
+        q_ub[-1] = 1
+        
+        alt_bounds = Bounds(q_lb, q_ub)
+        return alt_bounds
+    
+    if serial_corr == True:
+        # bounds for serial correlation
+        q_lb[-1] = 0
         q_ub[-1] = 1
         
         alt_bounds = Bounds(q_lb, q_ub)
@@ -505,11 +546,8 @@ def calc_S2(theta, M, N, T, k, u, Q_template = np.array(None), stop_region = 1e5
     return S2
 
 # Calculate cost function with serially correlated noise terms
-def calc_SC(param, M, N, T, k, u, Q_template = np.array(None), stop_region = 1e5):
+def calc_SC(theta, M, N, T, k, u, Q_template = np.array(None), stop_region = 1e5):
     SC = np.zeros(1, dtype = 'float128')
-    
-    ro = param[-1]
-    theta = param[:-1]
         
     for l in range(2,T):
         
@@ -900,10 +938,7 @@ def bootstrap_resResamp(data, time_interval, n_bootstrapSamples, n_param, theta_
     ## POINT ESTIMATION
     print("Point estimate calculation ...")
     
-    # set variables for estimation
-    N, M, T, k = eqTin(data, giveK=True)
-    u = time_interval
-    
+ 
     # set first time point as data from real dataset
     prop_boot[:,0] = N[:,0]
     
