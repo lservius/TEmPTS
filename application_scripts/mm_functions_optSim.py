@@ -924,7 +924,7 @@ def bootstrap_caseResamp(repertoire, n_bootstrapSamples, timeParam, n_param, the
 
 
 ## NON-PARAMETRIC: RESAMPLING RESIDUALS
-def bootstrap_resResamp(data, time_interval, n_bootstrapSamples, n_param, theta_generator, mcArgs, optimiserArgs, options={'alpha_significance': 0.05}, Q_template = np.array(None)):
+def bootstrap_resResamp(data, time_interval_all, n_bootstrapSamples, n_param, theta_generator, mcArgs, optimiserArgs, options={'alpha_significance': 0.05}, Q_template = np.array(None), perDonorBS_Fun = None):
     # number of bootstrap samples
     B = n_bootstrapSamples
     
@@ -938,11 +938,10 @@ def bootstrap_resResamp(data, time_interval, n_bootstrapSamples, n_param, theta_
     ## POINT ESTIMATION
     print("Point estimate calculation ...")
     
- 
     # set first time point as data from real dataset
+    N, M, T, k = eqTin(data, proportion=False)
+    u = time_interval_all
     prop_boot[:,0] = N[:,0]
-    
-    optimiserArgs['args'] = (M, N, T, k, u)
     
     # first estimation
     theta_point, _cost = parallel_mc_optimiser(iter_samp=mcArgs['mciter'], n_cores=mcArgs['n_cores'], n_param=n_param, theta_generator=theta_generator, optimiserArgs=optimiserArgs, options=options, progress_bar = True)
@@ -956,6 +955,9 @@ def bootstrap_resResamp(data, time_interval, n_bootstrapSamples, n_param, theta_
         
     residSampling = lambda state: np.random.choice(resid[:,state], replace=True)
     
+    if perDonorBS_Fun != None:
+        optimiserArgs['costFunc'] = perDonorBS_Fun
+    
     # track bootstrap progress
     bar = progressbar.ProgressBar(maxval=B, \
     widgets=['Bootstrap progress:',' ',progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
@@ -963,9 +965,6 @@ def bootstrap_resResamp(data, time_interval, n_bootstrapSamples, n_param, theta_
     
     for i in range(B):
         ## RESAMPLING
-        # empty dataframe for new sampled df
-        sim_boot = pd.DataFrame({'State': [], 'Day': []})
-
         for t in range(1,T):
             sampRes = list( map( residSampling, range(k-1)) )
             
@@ -1035,15 +1034,12 @@ def bootstrap_parametric(data, time_interval, n_bootstrapSamples, n_param, theta
     # first estimation
     theta_est, _cost = parallel_mc_optimiser(iter_samp=mcArgs['mciter'], n_cores=mcArgs['n_cores'], n_param=n_param, theta_generator=theta_generator, optimiserArgs=optimiserArgs, options=options, progress_bar = True)    
     
-    # save out value
-    theta_boot[0,:] = theta_est
-    
     # track bootstrap progress
     bar = progressbar.ProgressBar(maxval=B, \
     widgets=['Bootstrap progress:',' ',progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
     bar.start()
     
-    for i in range(1,B):
+    for i in range(0,B):
         ## GENERATE
         if optimiserArgs.get('ingress') == True:
             Q_boot = theta_to_Q(theta_boot[(i-1),:-1], k, Q_template)
