@@ -1,1 +1,1 @@
-TEmPTation: **T**emporal **E**sti**m**ation of **P**roportional **T**r**a**nsition
+TEmPT: **T**emporal **E**sti**m**ation of **P**roportional **T**ransition
