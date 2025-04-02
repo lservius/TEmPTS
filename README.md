@@ -1,6 +1,6 @@
 # TEmPTS: **T**ransition **E**sti**m**ation for **P**roportional **T**ime **S**equence
 
-This repo is a work in progress and contains all the scripts used for the Servius et al. manuscript "On the estimation of state transitions of proportional data with uncertainty quantification".
+This repo is a work in progress and contains all the scripts used for the Servius et al. manuscript "State transition estimation in proportional data sequence with applications in immunology".
 
 The calcualtion of the point estimates for the application examples are in each respective folder as well as the boostrap implementation. An example script for the parallelised bootstrap, will be added in due coarse and can be requested before then.
 
