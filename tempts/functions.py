@@ -748,25 +748,9 @@ def oneCore_mc_optimiser(
 
 def parallel_mc_optimiser(
     iter_samp, n_cores, n_param, theta_generator=make_theta0,
-    optimiserArgs=None, options=None, progress_bar=False
+    optimiserArgs=None, options=None, progress_bar=False,
+    convergence_tol=None, pool=None,
 ):
-    """
-    Parallel multi-start optimiser using ``multiprocess.Pool``.
-
-    Parameters
-    ----------
-    iter_samp : int
-    n_cores : int
-    n_param : int
-    theta_generator : callable
-    optimiserArgs : dict
-    options : dict
-    progress_bar : bool
-
-    Returns
-    -------
-    (theta_best, cost_best) : (ndarray, float)
-    """
     if optimiserArgs is None:
         optimiserArgs = {
             'costFunc': None, 'args': None, 'bounds': None,
@@ -777,50 +761,52 @@ def parallel_mc_optimiser(
             'initial': 1e0, 'hessian': None,
             'xterm': 1e-8, 'gterm': 1e-15, 'max_iter': 1e4,
         }
-
     optimiserArgs.setdefault('ingressAccount', False)
     options.setdefault('gterm', 1e-15)
 
-    chunk_size = ceil(iter_samp / n_cores)  # noqa: F841
+    worker = partial(
+        single_mc_optimiser,
+        optimiserArgs=optimiserArgs,
+        options=options,
+        theta_generator=theta_generator,
+    )
+    chunksize = max(1, ceil(iter_samp / (n_cores * 4)))
 
-    theta_samples = np.zeros((iter_samp, n_param))
-    cost_samples = np.full(iter_samp, np.inf)
-
-    mcArgs = {
-        'optimiserArgs': optimiserArgs,
-        'options': options,
-        'theta_generator': theta_generator,
-    }
+    best_cost = np.inf
+    best_theta = np.zeros(n_param)
 
     if progress_bar and _HAS_PROGRESSBAR:
         bar = progressbar.ProgressBar(maxval=iter_samp, redirect_stdout=True)
         bar.start()
 
+    _owns_pool = pool is None
+    if _owns_pool:
+        pool = Pool(processes=n_cores)
+
     try:
-        with Pool(processes=n_cores) as pool:
-            for result in pool.imap(
-                partial(
-                    single_mc_optimiser,
-                    optimiserArgs=mcArgs['optimiserArgs'],
-                    options=mcArgs['options'],
-                    theta_generator=mcArgs['theta_generator'],
-                ),
-                range(iter_samp),
-            ):
-                i, est, cost = result
-                if i is not None:
-                    theta_samples[i] = est
-                    cost_samples[i] = cost
-                if progress_bar and _HAS_PROGRESSBAR:
-                    bar.update(bar.currval + 1)
+        completed = 0
+        for result in pool.imap_unordered(worker, range(iter_samp), chunksize=chunksize):
+            i, est, cost = result
+            if i is not None and cost < best_cost:
+                best_cost = cost
+                best_theta = est.copy()
+            completed += 1
+            if progress_bar and _HAS_PROGRESSBAR:
+                bar.update(completed)
+            if convergence_tol is not None and best_cost < convergence_tol:
+                pool.terminate()
+                break
     except Exception as e:
         print(f"Error in parallel execution: {e}")
+    finally:
+        if _owns_pool:
+            pool.close()
+            pool.join()
 
     if progress_bar and _HAS_PROGRESSBAR:
         bar.finish()
 
-    min_idx = np.argmin(cost_samples)
-    return theta_samples[min_idx], cost_samples[min_idx]
+    return best_theta, best_cost
 
 
 # ---------------------------------------------------------------------------

@@ -30,15 +30,16 @@ pip install -e ".[dev]"
 ## Conceptual overview
 
 TEmPTS estimates a continuous-time Markov rate matrix **Q** from aggregate
-proportional observations.  Given proportions p(t) observed at time points
-t₀ < t₁ < … < t_T the package finds Q such that
+proportional observations.  Given proportions $\Pi_s$ observed at time points
+$t_0 < t_1 < … < t_S$ the package finds Q such that
 
-```
-p(uₗ) ≈ exp(Q · uₗ)ᵀ · p(tₗ₋₁)    where uₗ = tₗ − tₗ₋₁
-```
-
-via constrained nonlinear least-squares, with a biological prior that only
-forward transitions are permitted (upper-triangular Q).
+$$
+\boldsymbol{\Pi}_s  &= \mathbf{P}'(\delta_s) \boldsymbol{\Pi}_{s-1}
+$$
+where $\boldsymbol{\Pi}_s$ is the a $k \times 1$ vector of state probabilities 
+$\pi_j$ at $t_s$ and $\delta_s = t_s - t_{s-1}$. This is calculated via 
+constrained nonlinear least-squares, where system specific priors can be imposed,
+e.g. only forward transitions are permitted (upper-triangular Q).
 
 Uncertainty is quantified via a residual-resampling bootstrap that produces
 both bootstrap-t and BCa confidence intervals.
