@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tempts"
+version = "0.1.0"
+description = "Transition Estimation for Proportional Time Sequences (TEmPTS)"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "Servius et al." }]
+keywords = [
+    "markov-model",
+    "transition-probability",
+    "proportional-data",
+    "immunology",
+    "time-series",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "numpy>=1.23",
+    "pandas>=1.5",
+    "scipy>=1.9",
+]
+
+[project.optional-dependencies]
+parallel = ["multiprocess>=0.70"]
+progress = ["progressbar2>=4.0"]
+all = ["multiprocess>=0.70", "progressbar2>=4.0"]
+dev = ["pytest>=7", "pytest-cov"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tempts*"]
