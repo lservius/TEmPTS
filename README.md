@@ -3,7 +3,7 @@
 Python package based on Servius et al.,
 *"State transition estimation in proportional data sequence with applications in immunology"*.
 
-Original scripts: manuscript/appli_simData/mm_temptations_functions.py
+Original scripts: `manuscript/appli_simData/mm_temptations_functions.py`
 
 ---
 

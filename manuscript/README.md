@@ -12,6 +12,6 @@ The calculation of the point estimates for the application examples are in each 
 
 ### Note:
 
-(1) Each folder is self-contained with it's own function file `mm_temptations_functions.py`, these are all the same and were originally symlinks to a single file.
+(1) Each folder is self-contained with it's own function file `mm_temptations_functions.py`, these are symlinks to a single file - `manuscript/appli_simData/mm_temptations_functions.py`.
 
-(2) The `mm_temptations_functions.py` forms the basis of the package in `../tempts/`.
+(2) The `mm_temptations_functions.py` script forms the basis of the package in `../tempts/`.
