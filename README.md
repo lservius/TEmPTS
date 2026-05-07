@@ -34,9 +34,10 @@ proportional observations.  Given proportions $\Pi_s$ observed at time points
 $t_0 < t_1 < … < t_S$ the package finds Q such that
 
 $$
-\boldsymbol{\Pi}_s  &= \mathbf{P}'(\delta_s) \boldsymbol{\Pi}_{s-1}
+\Pi_s  = P'(\delta_s) \Pi_{s-1}
 $$
-where $\boldsymbol{\Pi}_s$ is the a $k \times 1$ vector of state probabilities 
+
+where $\Pi_s$ is the a $k \times 1$ vector of state probabilities 
 $\pi_j$ at $t_s$ and $\delta_s = t_s - t_{s-1}$. This is calculated via 
 constrained nonlinear least-squares, where system specific priors can be imposed,
 e.g. only forward transitions are permitted (upper-triangular Q).
