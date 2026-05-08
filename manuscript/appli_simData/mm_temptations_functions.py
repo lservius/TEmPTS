@@ -88,24 +88,24 @@ def statNam(n_states):
 # actually gennerate the aggregate states
 def generateAggStates(N0, Q_ij, n_generate, u = [1], recruit = True, timeCount = int(), timeMarker = 'd', noise = False):
     df = N0.copy()
-     
+
     # set the first date as reference
     firstDay = timeMarker + str(timeCount)
-    
+
     all_one_interval = all([u[i] == 1 for i in range(len(u))])
-    
+
     if all_one_interval == True:
        P_ij = transMat(Q_ij, 1)
-    
+
     iter = 1
-    while iter <= n_generate: 
-        
+    while iter <= n_generate:
+
         if all_one_interval == True:
             # name the day
             today = timeMarker + str(timeCount)
             tomorrow = timeMarker + str(timeCount + u[0])
             timeCount += 1
-            
+
         elif all_one_interval == False:
             # calculate and P
             P_ij = transMat(Q_ij, u[iter])
@@ -113,59 +113,57 @@ def generateAggStates(N0, Q_ij, n_generate, u = [1], recruit = True, timeCount =
             today = timeMarker + str(timeCount)
             tomorrow = timeMarker + str(timeCount + u[iter])
             timeCount += u[iter]
-            
-    
+
+
         # final column
         initial_values = df[today]
-        
+
         # next day
         d1 = []
-    
+
         # number of states
         n_state = len(P_ij)
-        
+
         # save out d0 values as array
         d0 = initial_values
-    
+
         for j in range(n_state):
-            
+
             # select related probability column
             P_i = P_ij[:,j]
-            
+
             # dot product
             dotProd = sum( d0 * P_i )
-            
+
             # only want integer value
             dotProd = int(dotProd)
-            
+
             d1.append(dotProd)
-            
+
             if recruit == True:
                 # add recruits to first state
                 recLam = int(np.log10(sum(df[firstDay])) - 2 )
                 d1[0] = int(d1[0] + np.random.poisson(10**recLam,1))
-                
+
         # add to data
         df[tomorrow] = d1
-        
+
         if noise == True:
             # add 1% noise but prevent negative values
             scale_noise = df[tomorrow] * 0.01
             df[tomorrow] += np.random.poisson(lam=scale_noise)
             df.loc[df[tomorrow] < 0, tomorrow] = 0
-                    
+
         iter += 1
-        
-    
+
+
     return df
+
 
 # generate the parameters for simulation or estimation seeds
 def make_theta0(k, format = 'theta', ub = 1e-1, options = {'ingress': False, 'initial': 1e0}):
-    # create starting intensity trans. mat
-    Q_0 = np.zeros((k,k))
-    
     Q_0 = np.random.uniform(1e-12, ub, size=(k,k))
-    Q_0 = np.triu(Q_0) # biological constraint - no moving backwards!
+    Q_0 = np.triu(Q_0, 1) # biological constraint - no moving backwards!
     
     # set diag. to neg. sum rest of row
     row_sums = Q_0.sum(axis=1)
@@ -341,7 +339,7 @@ def def_constraints(n_param, k):
      
 ## COST FUNCTIONS
 def calc_cost(theta, pi_hat, T, k, u, Q_template = np.array(None), stop_region = 1e5):
-    cost = 0.
+    cost = np.zeros(1, dtype = np.longdouble)
     
     # Q from theta
     Q = theta_to_Q(theta, k, Q_template)
@@ -378,7 +376,7 @@ def calc_cost(theta, pi_hat, T, k, u, Q_template = np.array(None), stop_region =
         cost += cost_l
 
         
-    return cost
+    return float(cost)
 
 # Calculate cost with donor consideration
 def calc_cost_donors(theta, pi_hat_donors, T_donors, k, u_donors, Q_template = np.array(None), stop_region = 1e5):
@@ -478,8 +476,8 @@ def oneCore_mc_optimiser(iter_samp, n_param, theta_generator = make_theta0, opti
         bar.start()
     
     for i, est, cost in map(partial(single_mc_optimiser, theta_generator=theta_generator, optimiserArgs=optimiserArgs, options=options), range(iter_samp)):
-        theta_samples[i-1] = est
-        cost_samples[i-1] = cost
+        theta_samples[i] = est
+        cost_samples[i] = cost
     
     if progress_bar:
         bar.update(i)   
@@ -549,8 +547,8 @@ def parallel_mc_optimiser(iter_samp, n_cores, n_param, theta_generator = make_th
                 if progress_bar:
                     bar.update(bar.currval + 1)
 
-                theta_samples[i-1] = est
-                cost_samples[i-1] = cost 
+                theta_samples[i] = est
+                cost_samples[i] = cost 
     
     except Exception as e:
         print(f"Error in parallel execution: {e}")
