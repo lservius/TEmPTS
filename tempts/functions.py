@@ -258,21 +258,22 @@ def make_theta0(k, format='theta', ub=1e-1, options=None):
     if options is None:
         options = {'ingress': False, 'initial': 1e0}
 
-    Q_0 = np.random.uniform(1e-12, ub, size=(k, k))
-    Q_0 = np.triu(Q_0)                         # biological: no backwards
-    row_sums = Q_0.sum(axis=1)
-    np.fill_diagonal(Q_0, -row_sums)
+    Q_0 = np.zeros((k, k))
+    vals = np.array([rand.uniform(1e-12, ub) for _ in range(k * (k - 1) // 2)])
+    Q_0[np.triu_indices(k, 1)] = vals                           # biological: no backwards
+    
+    # diagonal = negative row sum
+    np.fill_diagonal(Q_0, -Q_0.sum(axis=1))
 
     if format == 'Q':
-        return Q_0
-
-    theta_0 = Q_0[np.nonzero(Q_0[:, :-1])]
-
-    if options.get('ingress'):
-        income = options.get('initial', 1e0)
-        theta_0 = np.append(theta_0, income)
-
-    return theta_0
+        result = Q_0
+    elif format == 'theta':
+        theta_0 = Q_0[np.nonzero(Q_0[:, :-1])]
+        result = theta_0
+        if options["ingress"] == True:
+            result = np.append(theta_0, options['initial'])
+    
+    return result
 
 
 # ---------------------------------------------------------------------------

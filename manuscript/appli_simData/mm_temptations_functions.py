@@ -162,22 +162,20 @@ def generateAggStates(N0, Q_ij, n_generate, u = [1], recruit = True, timeCount =
 
 # generate the parameters for simulation or estimation seeds
 def make_theta0(k, format = 'theta', ub = 1e-1, options = {'ingress': False, 'initial': 1e0}):
-    Q_0 = np.random.uniform(1e-12, ub, size=(k,k))
-    Q_0 = np.triu(Q_0, 1) # biological constraint - no moving backwards!
+    Q_0 = np.zeros((k, k))
+    vals = np.array([rand.uniform(1e-12, ub) for _ in range(k * (k - 1) // 2)])
+    Q_0[np.triu_indices(k, 1)] = vals
     
-    # set diag. to neg. sum rest of row
-    row_sums = Q_0.sum(axis=1)
-    np.fill_diagonal(Q_0, -row_sums)
-    
+    # diagonal = negative row sum
+    np.fill_diagonal(Q_0, -Q_0.sum(axis=1))
+
     if format == 'Q':
         result = Q_0
     elif format == 'theta':
-        theta_0 = Q_0[np.nonzero(Q_0[:,:-1])]
+        theta_0 = Q_0[np.nonzero(Q_0[:, :-1])]
         result = theta_0
-        
         if options["ingress"] == True:
-            income = options['initial']
-            result = np.append(theta_0, income)
+            result = np.append(theta_0, options['initial'])
     
     return result
 
@@ -339,7 +337,7 @@ def def_constraints(n_param, k):
      
 ## COST FUNCTIONS
 def calc_cost(theta, pi_hat, T, k, u, Q_template = np.array(None), stop_region = 1e5):
-    cost = np.zeros(1, dtype = np.longdouble)
+    cost = 0.0
     
     # Q from theta
     Q = theta_to_Q(theta, k, Q_template)
@@ -376,7 +374,7 @@ def calc_cost(theta, pi_hat, T, k, u, Q_template = np.array(None), stop_region =
         cost += cost_l
 
         
-    return float(cost)
+    return cost
 
 # Calculate cost with donor consideration
 def calc_cost_donors(theta, pi_hat_donors, T_donors, k, u_donors, Q_template = np.array(None), stop_region = 1e5):
